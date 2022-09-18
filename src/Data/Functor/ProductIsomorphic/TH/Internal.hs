@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
 
@@ -37,15 +38,13 @@ recordInfo' =  d  where
       <|>
       do (_cxt, tcn, bs, _mk,  r , _ds)  <-  unNewtypeD tcon
          Just (tcn, bs, r)
-    let vns = map getTV bs
+    let vns = map tyVarBndrName bs
     case r of
       NormalC dcn ts   -> Just (((buildT tcn vns, vns), conE dcn), (Nothing, [return t | (_, t) <- ts]))
       RecC    dcn vts  -> Just (((buildT tcn vns, vns), conE dcn), (Just ns, ts))
         where (ns, ts) = unzip [(n, return t) | (n, _, t) <- vts]
       _                -> Nothing
   d _                  =  Nothing
-  getTV (PlainTV n)    =  n
-  getTV (KindedTV n _) =  n
   buildT tcn vns = foldl' appT (conT tcn) [ varT vn | vn <- vns ]
 
 -- | Low-level reify interface for record type name.
@@ -80,3 +79,13 @@ defineTupleProductConstructor :: Int     -- ^ n-tuple
                               -> Q [Dec] -- ^ result template
 defineTupleProductConstructor =
   defineProductConstructor . tupleTypeName
+
+#if MIN_VERSION_template_haskell(2,17,0)
+tyVarBndrName :: TyVarBndr flag -> Name
+tyVarBndrName (PlainTV n _) = n
+tyVarBndrName (KindedTV n _ _) = n
+#else
+tyVarBndrName :: TyVarBndr -> Name
+tyVarBndrName (PlainTV n) = n
+tyVarBndrName (KindedTV n _) = n
+#endif
